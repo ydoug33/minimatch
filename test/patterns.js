@@ -162,9 +162,11 @@ module.exports = [
   // or tell them to grow up and stop complaining.
   //
   // bash/bsdglob says this:
-  // , ["*(a|{b),c)}", ["*(a|{b),c)}"], {}, ["a", "ab", "ac", "ad"]]
+  // ["*(a|{b),c)}", ["*(a|{b),c)}"], {}, ["a", "ab", "ac", "ad"]]
   // but we do this instead:
   ['*(a|{b),c)}', ['a', 'ab', 'ac'], {}, ['a', 'ab', 'ac', 'ad']],
+
+  ['*([[:alpha:]])', ['a', 'ab', 'ac', 'ad'], {}, ['a', 'ab', 'ac', 'ad']],
 
   // test partial parsing in the presence of comment/negation chars
   ['[!a*', ['[!ab'], {}, ['[!ab', '[ab']],
@@ -173,9 +175,19 @@ module.exports = [
   // like: {a,b|c\\,d\\\|e} except it's unclosed, so it has to be escaped.
   [
     '+(a|*\\|c\\\\|d\\\\\\|e\\\\\\\\|f\\\\\\\\\\|g',
-    ['+(a|b\\|c\\\\|d\\\\|e\\\\\\\\|f\\\\\\\\|g'],
+    [
+      '+(a|b\\|c\\|d\\|e\\\\|f\\\\|g',
+      '+(a|b|c\\|d\\|e\\\\|f\\\\|g',
+    ],
     {},
-    ['+(a|b\\|c\\\\|d\\\\|e\\\\\\\\|f\\\\\\\\|g', 'a', 'b\\c'],
+    ['+(a|b\\|c\\\\|d\\\\|e\\\\\\\\|f\\\\\\\\|g', 'a', 'b\\c',
+      '+(a|b\\|c\\|d\\|e\\\\|f\\\\|g',
+      '+(a|b|c\\|d\\|e\\\\\\|f\\\\\\|g',
+      '+(a|b|c\\|d\\|e\\\\|f\\\\|g',
+      '+(a|b|c|d|e\\\\|f\\\\|g',
+      '+(a|b|c|d|e\\|f\\|g',
+      '+(a|b|c|d|e|f|g',
+    ],
     {skip: process.platform === 'win32'},
   ],
 
@@ -266,6 +278,9 @@ module.exports = [
 
   'comments match nothing',
   ['# ignore this', []],
+
+
+  ['@(a\\|b|c)', ['a|b', 'c'], {}, ['a', 'b', 'a|b', 'c', 'b|c']],
 ]
 
 Object.defineProperty(module.exports, 'files', {

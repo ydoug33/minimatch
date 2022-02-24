@@ -28,5 +28,8 @@
   "files": [
     "minimatch.js",
     "lib"
-  ]
+  ],
+  "tap": {
+    "coverage-map": "map.js"
+  }
 }

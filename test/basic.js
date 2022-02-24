@@ -11,6 +11,8 @@ const patterns = require('./patterns.js')
 t.test('basic tests', function (t) {
   var start = Date.now()
 
+  t.equal(mm.test, mm, 'minimatch.test() alias for minimatch()')
+
   // [ pattern, [matches], MM opts, files, TAP opts]
   patterns.forEach(function (c) {
     if (typeof c === 'function') return c()
@@ -24,6 +26,7 @@ t.test('basic tests', function (t) {
 
     // options.debug = true
     var m = new mm.Minimatch(pattern, options)
+    t.equal(m.test, m.match, 'm.test() alias for m.match()')
     var r = m.makeRe()
     var r2 = mm.makeRe(pattern, options)
     t.equal(String(r), String(r2), 'same results from both makeRe fns')
@@ -38,7 +41,7 @@ t.test('basic tests', function (t) {
 
     t.same(
       actual, expect,
-      JSON.stringify(pattern) + ' ' + JSON.stringify(expect),
+      JSON.stringify(pattern) + ' ' + JSON.stringify(expect) + ' ' + JSON.stringify(options),
       tapOpts
     )
 

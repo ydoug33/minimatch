@@ -10,36 +10,59 @@
 const mm = require('../')
 const t = require('tap')
 
-const patterns = []
-for (const ab of ['!', '@']) {
-  for (const a of ['!', '@']) {
-    for (const b of ['!', '@']) {
-      for (const c of ['!', '@']) {
-        patterns.push(`${ab}(${a}(a)|${b}(b))x${c}(c)`)
-      }
-    }
-  }
-}
-for (const a of ['!', '@']) {
-  for (const bc of ['!', '@']) {
-    for (const b of ['!', '@']) {
-      for (const c of ['!', '@']) {
-        patterns.push(`${a}(a)x${bc}(${b}(b)|${c}(c))`)
-      }
-    }
-  }
-}
 const files = []
-for (const first of ['a', 'b', 'c']) {
-  for (const last of ['a', 'b', 'c']) {
+for (const first of ['a', 'b', 'c', 'd']) {
+  for (const last of ['a', 'b', 'c', 'd']) {
     files.push(`${first}x${last}`)
   }
 }
-for (const p of patterns) {
+
+const patterns = {}
+for (const ab of ['@', '!']) {
+  for (const a of ['@', '!']) {
+    for (const b of ['@', '!']) {
+      for (const c of ['@', '!']) {
+        const pattern = `${ab}(${a}(a)|${b}(b))x${c}(c)`
+        patterns[pattern] = files.filter(file => {
+          const f = file.slice(0, 1)
+          const l = file.slice(-1)
+          const ap = a === '!' ? f !== 'a' : f === 'a'
+          const bp = b === '!' ? f !== 'b' : f === 'b'
+          const abp = ab === '!' ? (!ap && !bp) : (ap || bp)
+          const cp = c === '!' ? l !== 'c' : l === 'c'
+          return abp && cp
+        })
+      }
+    }
+  }
+}
+
+for (const a of ['@', '!']) {
+  for (const bc of ['@', '!']) {
+    for (const b of ['@', '!']) {
+      for (const c of ['@', '!']) {
+        const pattern = `${a}(a)x${bc}(${b}(b)|${c}(c))`
+        patterns[pattern] = files.filter(file => {
+          const f = file.slice(0, 1)
+          const l = file.slice(-1)
+          const ap = a === '!' ? f !== 'a' : f === 'a'
+          const bp = b === '!' ? l !== 'b' : l === 'b'
+          const cp = c === '!' ? l !== 'c' : l === 'c'
+          const bcp = bc === '!' ? (!bp && !cp) : (bp || cp)
+          return ap && bcp
+        })
+      }
+    }
+  }
+}
+
+for (const [p, expect] of Object.entries(patterns)) {
   t.test(p, t => {
     const m = new mm.Minimatch(p, { nonegate: true })
-    t.notMatch(m.set, [[/$./]], 'should be valid: ' + p)
-    t.matchSnapshot(files.filter(f => m.match(f)))
+    if (t.notMatch(m.set, [[/$./]], `valid ${p}`)) {
+      const actual = files.filter(f => m.match(f))
+      t.same(actual, expect, `results ${p}`)
+    }
     t.end()
   })
 }

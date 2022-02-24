@@ -2,9 +2,6 @@
 
 A minimal matching utility.
 
-[![Build Status](https://travis-ci.org/isaacs/minimatch.svg?branch=master)](http://travis-ci.org/isaacs/minimatch)
-
-
 This is the matching library used internally by npm.
 
 It works by converting glob expressions into JavaScript `RegExp`
@@ -12,12 +9,12 @@ objects.
 
 ## Usage
 
-```javascript
-var minimatch = require("minimatch")
+```js
+const minimatch = require('minimatch')
 
-minimatch("bar.foo", "*.foo") // true!
-minimatch("bar.foo", "*.bar") // false!
-minimatch("bar.foo", "*.+(bar|foo)", { debug: true }) // true, and noisy!
+minimatch('bar.foo', '*.foo') // true!
+minimatch('bar.foo', '*.bar') // false!
+minimatch('bar.foo', '*.+(bar|foo)', { debug: true }) // true, and noisy!
 ```
 
 ## Features
@@ -35,7 +32,7 @@ See:
 * `man 3 fnmatch`
 * `man 5 gitignore`
 
-## Windows
+## Windows and Path Separators
 
 **Please only use forward-slashes in glob expressions.**
 
@@ -45,40 +42,59 @@ forward-slashes **only** in glob expressions.  Back-slashes in patterns
 will always be interpreted as escape characters, not path separators.
 
 Note that `\` or `/` _will_ be interpreted as path separators in paths on
-Windows, and will match against `/` in glob expressions.
+Windows, and will match against `/` in glob expressions.  But a `\` in a
+glob expression will be treated as an escape character only.
 
-So just always use `/` in patterns.
+So just always use `/` as the path separator in patterns.
 
 ## Minimatch Class
 
 Create a minimatch object by instantiating the `minimatch.Minimatch` class.
 
-```javascript
-var Minimatch = require("minimatch").Minimatch
-var mm = new Minimatch(pattern, options)
+```js
+const { Minimatch } = require('minimatch')
+const mm = new Minimatch(pattern, options)
 ```
 
 ### Properties
 
 * `pattern` The original pattern the minimatch object represents.
 * `options` The options supplied to the constructor.
-* `set` A 2-dimensional array of regexp or string expressions.
-  Each row in the
-  array corresponds to a brace-expanded pattern.  Each item in the row
-  corresponds to a single path-part.  For example, the pattern
-  `{a,b/c}/d` would expand to a set of patterns like:
+* `set` A 2-dimensional array of regexp or string expressions.  Each row in
+  the array corresponds to a brace-expanded pattern.  Each item in the row
+  corresponds to a single path-part.  For example, the pattern `{a,b/c}/d`
+  would expand to a set of patterns like:
 
-        [ [ a, d ]
-        , [ b, c, d ] ]
+        [
+          [ a, d ],
+          [ b, c, d ],
+        ]
 
     If a portion of the pattern doesn't have any "magic" in it
     (that is, it's something like `"foo"` rather than `fo*o?`), then it
     will be left as a string rather than converted to a regular
     expression.
 
+    Regular expressions in the set members are decorated with the following
+    additional fields:
+
+    * `_glob`: The portion of the pattern that generated the regexp
+    * `_src`: The string regexp source that was generated
+    * `_ast`: The abstract syntax tree of the glob pattern
+
 * `regexp` Created by the `makeRe` method.  A single regular expression
   expressing the entire pattern.  This is useful in cases where you wish
   to use the pattern somewhat like `fnmatch(3)` with `FNM_PATH` enabled.
+
+    **Note**: the regular expression returned by `makeRe` will often match
+    `*` against dotfiles on [engines that lack regular expression
+    lookbehind](https://caniuse.com/js-regexp-lookbehind).  If you want to
+    ensure dots are properly filtered, and your code runs on platforms
+    without this feature, use the other minimatch functions, not `makeRe`.
+
+    It is best to use `m.match(path)` rather than testing against
+    `m.regexp` whenever possible.
+
 * `negate` True if the pattern is negated.
 * `comment` True if the pattern is a comment.
 * `empty` True if the pattern is `""`.
@@ -88,11 +104,11 @@ var mm = new Minimatch(pattern, options)
 * `makeRe` Generate the `regexp` member if necessary, and return it.
   Will return `false` if the pattern is invalid.
 * `match(fname)` Return true if the filename matches the pattern, or
-  false otherwise.
+  false otherwise.  Alias `test(fname)`
 * `matchOne(fileArray, patternArray, partial)` Take a `/`-split
   filename, and match it against a single row in the `regExpSet`.  This
   method is mainly for internal use, but is exposed so that it can be
-  used by a glob-walker that needs to avoid excessive filesystem calls.
+  used by glob walkers that need to avoid excessive filesystem calls.
 
 All other methods are internal, and will be called as necessary.
 
@@ -100,32 +116,66 @@ All other methods are internal, and will be called as necessary.
 
 Main export.  Tests a path against the pattern using the options.
 
-```javascript
-var isJS = minimatch(file, "*.js", { matchBase: true })
+Alias: `minimatch.test(path, pattern, options)`
+
+```js
+const isJS = minimatch(file, "*.js", { matchBase: true })
 ```
 
 ### minimatch.filter(pattern, options)
 
-Returns a function that tests its
-supplied argument, suitable for use with `Array.filter`.  Example:
+Returns a function that tests its supplied argument, suitable for use with
+`Array.filter`.  Example:
 
-```javascript
-var javascripts = fileList.filter(minimatch.filter("*.js", {matchBase: true}))
+```js
+const filterFn = minimatch.filter("*.js", {matchBase: true})
+const javascripts = fileList.filter(filterFn)
 ```
 
 ### minimatch.match(list, pattern, options)
 
-Match against the list of
-files, in the style of fnmatch or glob.  If nothing is matched, and
-options.nonull is set, then return a list containing the pattern itself.
+Match against the list of files, in the style of fnmatch or glob.  If
+nothing is matched, and options.nonull is set, then return a list
+containing the pattern itself.
 
-```javascript
-var javascripts = minimatch.match(fileList, "*.js", {matchBase: true}))
+```js
+const javascripts = minimatch.match(fileList, "*.js", {matchBase: true}))
 ```
 
 ### minimatch.makeRe(pattern, options)
 
 Make a regular expression object from the pattern.
+
+#### Compatibility Note
+
+The regular expression returned by `minimatch.makeRe` relies upon support
+for regular expression lookbehind to correctly detect leading dots and
+prevent them from matching.  On [JavaScript engines where lookbehind is not
+supported](https://caniuse.com/js-regexp-lookbehind), this means that the
+regular expression returned by `makeRe` will sometimes match dot-prefixed
+files when it should not.
+
+If you need to support platforms without support for lookbehind, please use
+the main minimatch functions instead of creating one large regular
+expression.
+
+For example, instead of this:
+
+```
+// Unsafe on systems without regular expression lookbehind!
+const pattern = minimatch.makeRe('a/*/b')
+const notActuallyDotFiltered = files.filter(f => pattern.test(f))
+// Oh no! Includes a/.x/b
+```
+
+Do this:
+
+```js
+// Behaves the same on systems that lack regular expression lookbehind
+const pattern = new minimatch.Minimatch('a/*/b')
+const notActuallyDotFiltered = files.filter(f => pattern.test(f))
+// Properly filters out a/.x/b
+```
 
 ## Options
 
@@ -151,9 +201,15 @@ the pattern does not explicitly have a period in that spot.
 Note that by default, `a/**/b` will **not** match `a/.d/b`, unless `dot`
 is set.
 
+**Note**: the regular expression returned by `makeRe` will often match `*`
+against dotfiles on [engines that lack regular expression
+lookbehind](https://caniuse.com/js-regexp-lookbehind).  If you want to
+ensure dots are properly filtered, and your code runs on platforms without
+this feature, use the other minimatch functions, not `makeRe`.
+
 ### noext
 
-Disable "extglob" style patterns like `+(a|b)`.
+Disable "extglob" style patterns like `+(a|b)` and `!(x|y|)`
 
 ### nocase
 
@@ -212,7 +268,15 @@ If the pattern starts with a `!` character, then it is negated.  Set the
 characters normally.  This is perhaps relevant if you wish to start the
 pattern with a negative extglob pattern like `!(a|B)`.  Multiple `!`
 characters at the start of a pattern will negate the pattern multiple
-times.
+times.  (Negating the pattern an even number of times means that it is not
+negated.)
+
+Some patterns are parse errors in bash, but supported by this
+implementation.  For example, in bash, the pattern `@(x|@(y|a)` will raise a
+parse error.  However, in this implementation (if extglobs are not
+suppressed by setting `noext:true` in the options), it will match
+the strings `'@(x|a'` and `'@(x|y'`.  That is, the innermost extglob sets
+are parsed first, and unmatched outer extglobs are not parsed as extglobs.
 
 If a pattern starts with `#`, then it is treated as a comment, and
 will not match anything.  Use `\#` to match a literal `#` at the
@@ -241,4 +305,6 @@ Note that `fnmatch(3)` in libc is an extremely naive string comparison
 matcher, which does not do anything special for slashes.  This library is
 designed to be used in glob searching and file walkers, and so it does do
 special things with `/`.  Thus, `foo*` will not match `foo/bar` in this
-library, even though it would in `fnmatch(3)`.
+library, even though it would in `fnmatch(3)`.  This makes minimatch a poor
+choice for replicating the behavior of tools like `find(1)` that use
+fnmatch for matching paths.
